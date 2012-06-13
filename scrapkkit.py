@@ -11,7 +11,8 @@
 # NOTE: All commented lines of CODE are debug messages for when something goes wrong.
 
 # Step 1: Import all the necessary libraries.
-import socket, sys, string, time
+import socket, sys, string, time, mongokit, random
+from mongokit import Document, Connection
 
 # Step 2: Enter your information for the bot. Incl Port of IRC Server, Nick that
 # the Bot will take, host (IRC server), RealName, Channel that you want the bot
@@ -20,15 +21,32 @@ port = 6667
 nick = "Scrapkkit"
 host = 'irc.eu.esper.net'
 name =  "ScrapkkitBot"
-channel = '#sprokkit'
+channel = '#bukkit+++'
 ident = 'Loveitwhenweletloose'
 #Nickpasscheck: 1 - The nick requires a pass. 0 - The nick does NOT require a pass.
-nickpasscheck = 1
+nickpasscheck = 0
 #Nickpass: Password for Nick (If required.)
 nickpass = 'changeme'
 
 #botadmin: your nick is inputted for access to debug commands such as graceful shutdown and debug messages
 botadmin = 'resba'
+botadmin2 = 'resriori'
+
+mongo_host = '127.0.0.1'
+mongo_port = 27017
+mongo_db = 'ircq'
+
+connection = Connection(mongo_host,mongo_port)
+
+class Quote(Document):
+    use_schemaless = True
+    structure = {
+        'uid': int,
+        'quote': str,
+    }
+    use_dot_notation = True
+
+connection.register([Quote])
 
 #DebugSwitch: For use when debug is needed.
 debug = 0
@@ -42,7 +60,9 @@ woot.send ( 'USER ' + ident + ' 0 * :SprokkitBot\r\n' )
 global nameslist
 global sentmessage
 global messageable
+#global blacklist
 messageable = ''
+#blacklist = ''
 lastUsed = time.time()
 # Beginning the Loop here.
 while 1:
@@ -78,8 +98,11 @@ while 1:
                 return 0
             else:
                 #If the user is NOT privilidged, then they need to jump through a few more hoops.
+                mySubString = sentmessage[sentmessage.find(":")+1:sentmessage.find("!")]
                 if(debug == 1):
-                    woot.send ( 'PRIVMSG '+channel+' :You are not a privilidged user \r\n' )
+                    woot.send ( 'PRIVMSG '+channel+' :You are not an elevated user \r\n' )
+ #               if (mySubString == blacklist):
+ #                   return 1
                 if(time.time() - lastUsed) > 10:
                     global lastUsed
                     lastUsed = time.time()
@@ -110,18 +133,67 @@ while 1:
         if data.find ( 'NickServ!' ) != -1:
             woot.send ( 'PRIVMSG NickServ :IDENTIFY '+nick+' '+nickpass+'\r\n' )
             nickpasscheck = 0
+    try:
+        if data.find ( 'plusq' ) != -1:
+            if (filterResponse() == 0):
+                sub = data.rsplit('!plusq ')
+                defcol = connection[mongo_db]['quotes']
+                fieldlist = list(defcol.Quote.find())
+                quote = defcol.Quote()
+                quote['uid'] = len(fieldlist)+1
+                qid = str(quote['uid'])
+                quote['quote'] = sub[1]
+                quote.save()
+                woot.send( 'PRIVMSG '+messageable+' :Saved quote '+qid+' to database. \r\n' )
 
+        if data.find( 'indexq' ) != -1:
+            if (filterResponse() == 0):
+                sub = data.rsplit('!indexq ')
+                defcol = connection[mongo_db]['quotes']
+                fieldlist = defcol.Quote.find_one({'uid': int(sub[1])})
+                farray = [fieldlist]
+                fint = [x['uid'] for x in farray]
+                fquote = [x['quote'] for x in farray]
+                final = fquote[0].replace('\r\n','')
+                qid = str(len(list(defcol.Quote.find())))
+                woot.send( 'PRIVMSG '+messageable+' :Quote ['+str(fint[0])+'/'+str(qid)+'] -- '+str(final)+' \r\n' )
+        if data.find( 'findq' ) != -1:
+            if (filterResponse() == 0):
+                sub = data.rsplit('!findq ')
+                defcol = connection[mongo_db]['quotes']
+                fieldlist = defcol.Quote.find_one({'quote': { '$regex' : str(sub[1]), '$options': 'i' }})
+                farray = [fieldlist]
+                fint = [x['uid'] for x in farray]
+                fquote = [x['quote'] for x in farray]
+                final = fquote[0].replace('\r\n','')
+                qid = str(len(list(defcol.Quote.find())))
+                woot.send( 'PRIVMSG '+messageable+' :Quote ['+str(fint[0])+'/'+str(qid)+'] -- '+str(final)+' \r\n' )
+        if data.find( 'randq' ) != -1:
+            if (filterResponse() == 0):
+                defcol = connection[mongo_db]['quotes']
+                qid = str(len(list(defcol.Quote.find())))
+                fieldlist = defcol.Quote.find_one({'uid': random.randint(0,int(qid))})
+                farray = [fieldlist]
+                fint = [x['uid'] for x in farray]
+                fquote = [x['quote'] for x in farray]
+                final = fquote[0].replace('\r\n','')
+                woot.send( 'PRIVMSG '+messageable+' :Quote ['+str(fint[0])+'/'+str(qid)+'] -- '+str(final)+' \r\n' )
+
+
+##TODO: Random Quote
+
+    except IndexError:
+        woot.send( 'PRIVMSG '+messageable+' :Error! That is not a valid number! \r\n' )
+    except ValueError:
+        woot.send( 'PRIVMSG '+messageable+' :Error! That is not a valid number! \r\n' )
+    except TypeError:
+        woot.send( 'PRIVMSG '+messageable+' :Sorry man, I got nothin! :( \r\n' )
     if data.find ( 'test' ) != -1:
         if (filterResponse() == 0):
             woot.send( 'PRIVMSG '+messageable+' :Test command \r\n' ) 
     if data.find ( 'version' ) != -1:
         if (filterResponse() == 0):
-            woot.send( 'PRIVMSG '+messageable+' :--[Scrapkkit IRC Bot]-- \r\n' ) 
-            woot.send( 'PRIVMSG '+messageable+' :Python IRC Bot Based off of Sprokkit by resba. Implementation example of Sprokkit. \r\n' ) 
-            woot.send( 'PRIVMSG '+messageable+' :Scrapkkit v0.0.1-ALPHA By resba \r\n' ) 
-            woot.send( 'PRIVMSG '+messageable+' :GitHub: https://www.github.com/resba/Scrapkkit \r\n' ) 
-            woot.send( 'PRIVMSG '+messageable+' :Jenkins: http://dev.resbah.com:8080/job/Scrapkkit \r\n' ) 
-            woot.send( 'PRIVMSG '+messageable+' :Sprokkit: https://www.github.com/resba/Sprokkit \r\n' )
+            woot.send( 'PRIVMSG '+messageable+' :--[Scrapkkit IRC Bot]-- a pure python IRC bot by resba. https://www.github.com/resba/Scrapkkit \r\n' )
 
     def debugGrace():
         global messageable
@@ -167,3 +239,9 @@ while 1:
     if data.find ( '!debug.time.time' ) != -1:
         if (debugGrace()==1):
             woot.send ('PRIVMSG '+messageable+' :%s\r\n' % time.time() )
+    if data.find ( '!debug.blacklist' ) != -1:
+        if (debugGrace()==1):
+            sub = data.rsplit('!debug.blacklist ')
+            blacklist = sub[0]
+            woot.send ('PRIVMSG '+messageable+' :Got it. \r\n' )
+
