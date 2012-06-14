@@ -11,18 +11,21 @@
 # NOTE: All commented lines of CODE are debug messages for when something goes wrong.
 
 # Step 1: Import all the necessary libraries.
-import socket, sys, string, time, mongokit, random
+import socket, sys, string, time, mongokit, random, re
 from mongokit import Document, Connection
+
 
 # Step 2: Enter your information for the bot. Incl Port of IRC Server, Nick that
 # the Bot will take, host (IRC server), RealName, Channel that you want the bot
 # to function in, and IDENT value.
+host = raw_input('Enter Host: ')
+channel = raw_input('Enter Channel: ')
 port = 6667
-nick = "Scrapkkit"
-host = 'irc.eu.esper.net'
-name =  "ScrapkkitBot"
-channel = '#bukkit+++'
-ident = 'Loveitwhenweletloose'
+nick = "Ivanna"
+#host = 'irc.eu.esper.net'
+name =  "resbabot"
+#channel = '#bukkit+++'
+ident = 'resbabot'
 #Nickpasscheck: 1 - The nick requires a pass. 0 - The nick does NOT require a pass.
 nickpasscheck = 0
 #Nickpass: Password for Nick (If required.)
@@ -30,7 +33,7 @@ nickpass = 'changeme'
 
 #botadmin: your nick is inputted for access to debug commands such as graceful shutdown and debug messages
 botadmin = 'resba'
-botadmin2 = 'resriori'
+botadmin2 = 'pronto'
 
 mongo_host = '127.0.0.1'
 mongo_port = 27017
@@ -77,7 +80,9 @@ while 1:
         #The command has been called. First check to see what type of command was called.
         if data.find ( ':!' ) != -1:
             global messageable 
-            messageable = channel
+            chanstart = data.rsplit('PRIVMSG ')
+            chan2 = chanstart[1].rsplit(' :')
+            messageable = chan2[0]
             if (debug == 1):
                 woot.send ( 'PRIVMSG '+channel+' :The command was an announement ! \r\n' )
             #The command was an announcement. now we check for privilages.
@@ -159,15 +164,46 @@ while 1:
                 woot.send( 'PRIVMSG '+messageable+' :Quote ['+str(fint[0])+'/'+str(qid)+'] -- '+str(final)+' \r\n' )
         if data.find( 'findq' ) != -1:
             if (filterResponse() == 0):
+                if (debug == 1):
+                    woot.send ('PRIVMSG '+messageable+' :I started the command. \r\n')
                 sub = data.rsplit('!findq ')
                 defcol = connection[mongo_db]['quotes']
-                fieldlist = defcol.Quote.find_one({'quote': { '$regex' : str(sub[1]), '$options': 'i' }})
-                farray = [fieldlist]
-                fint = [x['uid'] for x in farray]
-                fquote = [x['quote'] for x in farray]
-                final = fquote[0].replace('\r\n','')
-                qid = str(len(list(defcol.Quote.find())))
-                woot.send( 'PRIVMSG '+messageable+' :Quote ['+str(fint[0])+'/'+str(qid)+'] -- '+str(final)+' \r\n' )
+                fieldlist = list(defcol.Quote.find())
+                fquote = [x['quote'] for x in fieldlist]
+                param = sub[1]
+                results = []
+                inte = 0
+                pattern = re.compile(param)
+                while inte != len(fquote):
+                    if pattern.search(str(fquote[inte])) != None :
+                        results.append(str(fquote[inte]))
+                    inte = inte + 1
+                if(len(results)==0):
+                    woot.send( 'PRIVMSG '+messageable+' :Count -- ' + str(len(results)) + '\r\n')
+                    woot.send( 'PRIVMSG '+messageable+' :Sorry, no results. \r\n' )
+                elif(len(results) == 1):
+                    woot.send( 'PRIVMSG '+messageable+' :Found 1 Quote!. \r\n' )
+                    woot.send( 'PRIVMSG '+messageable+' :'+results[0]+'. \r\n' )
+                elif(len(results) > 1):
+                    woot.send( 'PRIVMSG '+messageable+' :Found '+str(len(results))+' Quotes! Picking one at Random \r\n' )
+                    woot.send( 'PRIVMSG '+messageable+' :'+results[random.randint(0,int(len(results)))]+' \r\n' )
+#                    if(fieldlist.count() > 1):
+#                        woot.send( 'PRIVMSG '+messageable+' :More than 1 match \r\n')
+#                    elif(fieldlist.count() == 1):
+#                        woot.send ('PRIVMSG '+messageable+' :SUCCESS! \r\n')
+            if (debug == 1):
+                woot.send ('PRIVMSG '+messageable+' :I got to the end of the command. \r\n')
+#        if data.find( 'findq' ) != -1:
+#            if (filterResponse() == 0):
+#                sub = data.rsplit('!findq ')
+#                defcol = connection[mongo_db]['quotes']
+#                fieldlist = defcol.Quote.find_one({'quote': { '$regex' : str(sub[1]), '$options': 'i' }})
+#                #farray = fieldlist
+#                #fint = [x['uid'] for x in farray]
+#                #fquote = [x['quote'] for x in farray]
+#                #final = fquote[0].replace('\r\n','')
+#                qid = str(len(list(defcol.Quote.find())))
+#                woot.send( 'PRIVMSG '+messageable+' :Quote ['+str(fieldlist['uid'])+'/'+str(qid)+'] -- '+str(fieldlist['quote'])+' \r\n' )
         if data.find( 'randq' ) != -1:
             if (filterResponse() == 0):
                 defcol = connection[mongo_db]['quotes']
@@ -186,14 +222,17 @@ while 1:
         woot.send( 'PRIVMSG '+messageable+' :Error! That is not a valid number! \r\n' )
     except ValueError:
         woot.send( 'PRIVMSG '+messageable+' :Error! That is not a valid number! \r\n' )
-    except TypeError:
-        woot.send( 'PRIVMSG '+messageable+' :Sorry man, I got nothin! :( \r\n' )
+    except sre_constants.error:
+        woot.send( 'PRIVMSG '+messageable+' :Error! You have entered bad regex. Please Try Again. \r\n' )
+    
+#    except TypeError:
+#        woot.send( 'PRIVMSG '+messageable+' :Sorry man, I got nothin! :( \r\n' )
     if data.find ( 'test' ) != -1:
         if (filterResponse() == 0):
             woot.send( 'PRIVMSG '+messageable+' :Test command \r\n' ) 
     if data.find ( 'version' ) != -1:
         if (filterResponse() == 0):
-            woot.send( 'PRIVMSG '+messageable+' :--[Scrapkkit IRC Bot]-- a pure python IRC bot by resba. https://www.github.com/resba/Scrapkkit \r\n' )
+            woot.send( 'PRIVMSG '+messageable+' :--[Ivanna IRC Bot]-- a pure python IRC bot by resba. v1.2-rave https://www.github.com/resba/Scrapkkit \r\n' )
 
     def debugGrace():
         global messageable
@@ -245,3 +284,7 @@ while 1:
             blacklist = sub[0]
             woot.send ('PRIVMSG '+messageable+' :Got it. \r\n' )
 
+    if data.find ( '!addch' ) != -1:
+        if (debugGrace()==1):
+            sub = data.rsplit('!addch ')
+            woot.send ('JOIN '+sub[1]+'\r\n')
