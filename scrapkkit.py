@@ -151,6 +151,19 @@ while 1:
                 quote.save()
                 woot.send( 'PRIVMSG '+messageable+' :Saved quote '+qid+' to database. \r\n' )
 
+        if data.find ( 'addquote' ) != -1:
+            if (filterResponse() == 0):
+                sub = data.rsplit('!addquote ')
+                defcol = connection[mongo_db]['quotes']
+                fieldlist = list(defcol.Quote.find())
+                quote = defcol.Quote()
+                quote['uid'] = len(fieldlist)+1
+                qid = str(quote['uid'])
+                quote['quote'] = sub[1]
+                quote.save()
+                woot.send( 'PRIVMSG '+messageable+' :Saved quote '+qid+' to database. \r\n' )
+
+
         if data.find( 'indexq' ) != -1:
             if (filterResponse() == 0):
                 sub = data.rsplit('!indexq ')
@@ -227,9 +240,9 @@ while 1:
     
 #    except TypeError:
 #        woot.send( 'PRIVMSG '+messageable+' :Sorry man, I got nothin! :( \r\n' )
-    if data.find ( 'test' ) != -1:
-        if (filterResponse() == 0):
-            woot.send( 'PRIVMSG '+messageable+' :Test command \r\n' ) 
+#    if data.find ( 'test' ) != -1:
+#        if (filterResponse() == 0):
+#            woot.send( 'PRIVMSG '+messageable+' :Test command \r\n' ) 
     if data.find ( 'version' ) != -1:
         if (filterResponse() == 0):
             woot.send( 'PRIVMSG '+messageable+' :--[Ivanna IRC Bot]-- a pure python IRC bot by resba. v1.2-rave https://www.github.com/resba/Scrapkkit \r\n' )
